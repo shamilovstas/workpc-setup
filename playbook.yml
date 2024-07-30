@@ -1,0 +1,13 @@
+---
+- hosts: all
+  become: true
+  pre_tasks:
+    - name: update cache
+      dnf:
+        update_cache: yes
+      changed_when: false
+
+- hosts: default
+  become: true
+  roles:
+    - android

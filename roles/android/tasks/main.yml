@@ -1,0 +1,50 @@
+- name: Install dependencies
+  package:
+    name:
+      - unzip
+      - "{{ jdk }}"
+    state: latest
+
+- name: Create group for sdk owner
+  group:
+    name: "{{ android_sdk_group }}" 
+    state: present
+
+- name: Set cmdline temp dir
+  set_fact:
+    android_cmdline_temp_dir: "/tmp/cmdlinetools"
+
+- name: Create Android SDK dir structure
+  file:
+    path: "{{ item.path }}"
+    state: "{{ item.state }}"
+  with_items:
+    - { path: "{{ android_sdk_location }}", state: "directory" }
+    - { path: "{{ android_cmdline_temp_dir }}", state: "directory" }
+
+- name: Download Android command line tools
+  unarchive:
+    src: "https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip"
+    dest: "{{ android_cmdline_temp_dir }}"
+    remote_src: yes
+    creates: "{{ android_cmdline_temp_dir }}/cmdline-tools"
+
+- name: Accept licenses
+  shell: 
+    chdir: "{{ android_cmdline_temp_dir }}/cmdline-tools/bin"
+    cmd: "yes | ./sdkmanager --sdk_root={{ android_sdk_location }} --licenses"
+  changed_when: false
+
+- name: Install Android SDK
+  command: "{{ android_cmdline_temp_dir }}/cmdline-tools/bin/sdkmanager --sdk_root={{ android_sdk_location }} --install {{ item }}"
+  with_items: "{{ android_dependencies }}" 
+  register: install_output
+  changed_when: install_output | regex_search('Downloading')
+
+- name: Change sdk dir owner
+  file:
+    path: "{{ android_sdk_location }}"
+    recurse: true
+    mode: 0755
+    group: "{{ android_sdk_group }}"
+  when: install_output | regex_search('Downloading')
